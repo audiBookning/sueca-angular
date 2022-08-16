@@ -42,13 +42,12 @@ export class PlyStack {
   }
 
   waitingKeypress() {
-    return new Promise<Player | null>((resolve) => {
+    return new Promise<null>((resolve) => {
       const onKeyHandler = (e: { keyCode: number }) => {
         if (e.keyCode === 13) {
           document.removeEventListener('keydown', onKeyHandler);
-          const player = this.getWinner();
-          this.plySuit = null;
-          resolve(player);
+
+          resolve(null);
         }
       };
       document.addEventListener('keydown', onKeyHandler);
@@ -83,11 +82,17 @@ export class PlyStack {
     if (winningPlayer) {
       const windeck = winningPlayer.team?.winDeck;
       const sleep = (m: number) => new Promise((r) => setTimeout(r, m));
-      await sleep(4000);
+      await sleep(500);
       windeck?.addCards(this.getCards());
       await this.removeAllCardsFromSlot();
     }
     return winningPlayer;
+  }
+
+  getPlyValue(): number {
+    const cards = this.getCards();
+    const values = cards.map((card) => card.value);
+    return values.reduce((a, b) => a + b, 0);
   }
 
   getRankWithTrump(a: Card, b: Card) {
@@ -156,7 +161,7 @@ export class PlyStack {
 
     card.removed = true;
     if (this.getCardsLength() >= this.maximumSlots) {
-      //return this.waitingKeypress();
+      await this.waitingKeypress();
       const winningPlayer = await this.getWinner();
       this.plySuit = null;
       returnFrom = winningPlayer;

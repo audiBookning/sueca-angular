@@ -17,8 +17,9 @@ Use:
 ## Notes
 
 Implemented a form of min max search but it is still not very smart, although it has some interesting plays sometimes.
+ - => one of the last commit has corrected many of the "weird" ai behaviour, but lost the interesting plays and it is still dumb. At least it is more linear in terms of development. Not convinced that it is better.
 
-use svg temporarly, then change to png for pergormance reasons. In this case Svg doesn't seem to bring any advantages.
+use svg temporarly, then change to png for peformance reasons. In this case Svg doesn't seem to bring any advantages.
 
 The classes are extremely coupled to each other in an almost recursive way. For this use case, it is not important, but for a ore complex app, this type of pattern will kill the future of the app.
 
@@ -43,6 +44,22 @@ There is an angular service that isn't doing anything at the moment, but the cod
 - use a service for any components to interface with game engine
 
 - plugin ai architecture that can accept modular strategies?
+
+- add UI for choosing certain predefined hands for testing purpose
+
+## bugs in progress...
+
+- no click handler when human is not the 1 player
+
+- ai player in 2º doesn't cut when possible and plays a random card.
+  - The expected values are all zero
+
+- ai in last doesn't evaluate the hand correctly when it was cut by the teamate
+
+- ai in 1º play hasn't the value of his card added to the expected value and many times they are zero
+
+- ai if plays before the human player doesn't account for his play
+
 
 ## Usefull Angular cli commands for dev
 

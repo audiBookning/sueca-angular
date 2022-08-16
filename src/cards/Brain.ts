@@ -13,23 +13,27 @@ export class Brain {
   mainDeck: Deck;
 
   gameEval: GameEval;
+  players: Player[];
 
   constructor(
     player: Player,
     playerIndex: number,
     mainDeck: Deck,
-    plyStack: PlyStack
+    plyStack: PlyStack,
+    players: Player[]
   ) {
     this.player = player;
 
     this.plyStack = plyStack;
     this.mainDeck = mainDeck;
+    this.players = players;
 
     this.gameEval = new GameEval(
       mainDeck.getCards(),
-      playerIndex,
+      player,
       player.getHand(),
-      plyStack
+      plyStack,
+      players
     );
     //this.gameEval.evaluateCardsWithOwnHand()
   }

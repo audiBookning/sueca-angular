@@ -80,7 +80,13 @@ export class ShowCardsComponent implements OnInit, AfterViewInit {
       // TODO: do not send the maindeck, but only its cards and they should be sorted
       // to obsure the order of the player cards
       // or just implement a random deal of cards to each player
-      const newBrain = new Brain(player, index, this.mainDeck, this.plyStack);
+      const newBrain = new Brain(
+        player,
+        index,
+        this.mainDeck,
+        this.plyStack,
+        this.players
+      );
       this.brains.push(newBrain);
     });
 
@@ -118,6 +124,13 @@ export class ShowCardsComponent implements OnInit, AfterViewInit {
 
         this.playerTurn = player.position;
 
+        this.players.forEach((p) => {
+          const slot = +p.playerIndex - player.position;
+
+          const newIndex = ModuloUtil(slot, [0, 4], false);
+          p.playerIndex = newIndex;
+        });
+
         if (player.position !== 0) {
           this.playNextCard();
           return;
@@ -150,7 +163,7 @@ export class ShowCardsComponent implements OnInit, AfterViewInit {
   }
 
   async playNextCard() {
-    if (this.playerTurn === this.humanPlayer.playerIndex) {
+    if (this.playerTurn === this.humanPlayer.position) {
       return; // human player turn to play
     }
 

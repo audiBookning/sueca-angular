@@ -1,7 +1,15 @@
-import { ModuloUtil, RangeFromToUtil } from '../app/utils/utils';
+import {
+  FormatCardsEval,
+  FormatedCardsUtil,
+  FormatedCardUtil,
+  ModuloEasy,
+  ModuloUtil,
+  RangeFromToUtil,
+} from '../app/utils/utils';
 import { Card } from './Card';
 import { Deck } from './Deck';
 import { CardName, Suit } from './Enums';
+import { Player } from './Player';
 import { PlyStack } from './PlyStack';
 
 // TODO: needs to have a card probability of for each players.
@@ -11,8 +19,10 @@ import { PlyStack } from './PlyStack';
 
 export class GameEval {
   cardsEval: CardEval[] = [];
-  playerIndex: number;
+
   playerHand: Deck;
+  players: Player[] = [];
+  player: Player;
 
   public get trumpSuit(): Suit {
     return this.plyStack.trumpSuit;
@@ -28,17 +38,19 @@ export class GameEval {
   // receive all the cards when the main deck is instantiated.
   constructor(
     cards: Card[],
-    playerIndex: number,
+    player: Player,
     playerHand: Deck,
-    plyStack: PlyStack
+    plyStack: PlyStack,
+    players: Player[]
   ) {
     cards.forEach((card) => {
       this.cardsEval.push({ card, probability: [0, 0, 0, 0] });
     });
 
-    this.playerIndex = playerIndex;
+    this.player = player;
     this.playerHand = playerHand;
     this.plyStack = plyStack;
+    this.players = players;
   }
 
   // not working yet
@@ -52,17 +64,17 @@ export class GameEval {
         // TODO: the include check is not working correctly
 
         if (
-          this.playerIndex === playerIdx &&
+          this.player.position === playerIdx &&
           this.includesCard(card.card, playerCards)
         ) {
           card.probability[playerIdx] = 1;
         } else if (
-          this.playerIndex !== playerIdx &&
+          this.player.position !== playerIdx &&
           this.includesCard(card.card, playerCards)
         ) {
           card.probability[playerIdx] = 0;
         } else if (
-          this.playerIndex !== playerIdx &&
+          this.player.position !== playerIdx &&
           !this.includesCard(card.card, playerCards)
         ) {
           card.probability[playerIdx] =
@@ -97,6 +109,7 @@ export class GameEval {
   minMax() {
     let card: Card | undefined;
     const cardProp = this.evalCard();
+
     if (cardProp) {
       card = this.cardsEval.find(
         (c) =>
@@ -107,41 +120,89 @@ export class GameEval {
   }
 
   // min max
-  evalCard(
-    gameState = this.createGameState(this.playerIndex)
-  ): CardProp | null {
-    if (gameState.playerIndex > 3) return null;
-    const modulo = (ModuloUtil(gameState.playerIndex, [0, 2]) * -2 + 1) * 0.1;
+  evalCard(gameState = this.createGameState(this.player)): CardProp {
+    //if (gameState.playerIndex > 3) return null;
+    const modulo = ModuloUtil(gameState.player.position, [0, 2]) * -2 + 1;
+
     const candidateCards: CardProp[] = this.getCandidateCards(gameState);
 
     const ss: CardProp[] = candidateCards.map((card) => {
       const newGameState = structuredClone(gameState) as GameState;
+      const cardProbabilities = [...card.probability];
 
       newGameState.plyArray.push({
         suit: card.suit,
         rank: card.rank,
         value: card.value,
-        playerIndex: gameState.playerIndex,
+        cardName: card.cardName,
+        player: gameState.player,
       });
       // change cardProps and PlyArray since the card is played.
-      this.reEvalCardsProbabilities(gameState, card);
+      this.reEvalCardsProbabilities(newGameState, card);
       //
-      newGameState.playerIndex = newGameState.playerIndex + 1;
-      const temp = this.evalCard(newGameState);
-      let expectedValue: number =
+
+      /* let expectedValue2: number =
         card.probability[newGameState.playerIndex] * card.value +
-        (temp ? temp.expectedValue : 0);
+        (temp ? temp.expectedValue : 0); */
+
       const isWinning = this.checkIfWinning(newGameState);
-      if (isWinning.playerIndex === newGameState.playerIndex - 1) {
-        expectedValue *= 2.5;
+
+      let plyValue = newGameState.plyArray.reduce<number>(
+        (a, b) => a + b.value,
+        0
+      );
+      const checkTeam =
+        ModuloEasy(isWinning.player.position) ===
+        ModuloEasy(this.player.position);
+
+      if (checkTeam) {
+        plyValue *= 1;
+      } else {
+        plyValue *= -1;
       }
-      card.expectedValue = expectedValue * modulo;
+      let expectedValue: number =
+        cardProbabilities[newGameState.player.position] * plyValue;
+
+      const newPlayer = this.players.find((plr) => {
+        return plr.playerIndex === newGameState.player.playerIndex + 1;
+      });
+      let addedExpValue: number = 0;
+      if (newPlayer) {
+        newGameState.player = newPlayer;
+        addedExpValue = this.evalCard(newGameState).expectedValue;
+      }
+
+      expectedValue += addedExpValue;
+      card.expectedValue = expectedValue;
       return card;
     });
 
-    const hh = ss.sort((a, b) => a.expectedValue - b.expectedValue)[0];
-    return hh;
+    const hh2 = ss.sort((a, b) => {
+      return modulo > 0
+        ? a.expectedValue - b.expectedValue
+        : b.expectedValue - a.expectedValue;
+    });
+    let mTemp = modulo;
+    if (gameState.player.playerIndex === this.player.playerIndex) {
+      mTemp = 1;
+    } else {
+      mTemp = -1;
+    }
+    const hh = ss.sort((a, b) => {
+      return b.expectedValue - a.expectedValue * mTemp;
+    });
+
+    return hh[0];
   }
+
+  checkIfWinning(gameState: GameState): PlyTemp {
+    const sorted = gameState.plyArray.sort((a, b) =>
+      this.getRanWithTrump(a, b)
+    );
+
+    return sorted[0];
+  }
+
   // TODO: do not cut unless necessary.
   //   - cut over the teamate cut
   //   - cut over the teammate's "winning"? ply
@@ -164,7 +225,7 @@ export class GameEval {
       gameState.cardProps
         .filter((cardProp) => cardProp.suit === card.suit)
         .forEach((cardProp) => {
-          cardProp.probability[gameState.playerIndex] = 0;
+          cardProp.probability[gameState.player.position] = 0;
         });
     }
   }
@@ -174,7 +235,8 @@ export class GameEval {
     //
     const newCardProps: CardProp[] = gameState.cardProps.filter(
       (card) =>
-        card.removed === false && card.probability[gameState.playerIndex] > 0
+        card.removed === false &&
+        card.probability[gameState.player.position] > 0
     );
     if (gameState.plyArray.length < 1) return newCardProps;
     const gg = newCardProps.reduce<ValidCardProps>(
@@ -200,29 +262,23 @@ export class GameEval {
     }
   }
 
-  checkIfWinning(gameState: GameState): PlyTemp {
-    const sorted = gameState.plyArray.sort((a, b) =>
-      this.getRanWithTrump(a, b)
-    );
-    return sorted[0];
-  }
-
   getRanWithTrump(a: PlyTemp, b: PlyTemp) {
     const checksuit =
       -(a.suit === this.trumpSuit) - -(b.suit === this.trumpSuit);
     return checksuit || b.rank - a.rank;
   }
 
-  createGameState(playerIndex: number): GameState {
+  createGameState(player: Player): GameState {
     const plyArray: PlyTemp[] = this.plyStack
       .getSlotsArray()
-      .reduce<PlyTemp[]>((acum, { card, player }) => {
-        if (!card) return acum;
+      .reduce<PlyTemp[]>((acum, { card, player: plr }) => {
+        if (!card || !plr) return acum;
         const temp = {
           suit: card.suit,
           rank: card.rank,
           value: card.value,
-          playerIndex: player?.playerIndex,
+          player: plr,
+          cardName: card.cardName,
         };
         acum.push(temp);
         return acum;
@@ -244,7 +300,7 @@ export class GameEval {
       });
 
     return {
-      playerIndex,
+      player,
       plyArray,
       cardProps,
     };
@@ -254,15 +310,17 @@ export class GameEval {
 // INFO: smaller interface for better performance in cloning inside the search tree
 export interface GameState {
   cardProps: CardProp[];
-  playerIndex: number;
+  player: Player;
   plyArray: PlyTemp[];
 }
 
-interface PlyTemp {
+export interface PlyTemp {
   suit: Suit;
+  cardName: CardName;
   rank: number;
   value: number;
-  playerIndex: number | undefined;
+  player: Player;
+  expectedValue?: number;
 }
 
 export interface CardProp {
@@ -280,7 +338,7 @@ export interface ValidCardProps {
   withoutSuit: CardProp[];
 }
 
-interface CardEval {
+export interface CardEval {
   card: Card;
   probability: number[]; // of being in a array of players hands
 }

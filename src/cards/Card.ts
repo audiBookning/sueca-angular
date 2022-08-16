@@ -59,4 +59,13 @@ export class Card {
   public getIndex(): string {
     return this.toString();
   }
+
+  static toconvertToSvgName(suit: Suit, cardName: CardName): string {
+    const ff = `${Suit[suit]}_${
+      // @ts-ignore
+      CardNameString[CardName[cardName]]
+    }`;
+
+    return ff;
+  }
 }
